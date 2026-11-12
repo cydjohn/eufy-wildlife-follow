@@ -1,0 +1,4 @@
+# The unit tests mock the model, so CI needs only these (plus ffmpeg on PATH).
+numpy==2.2.6
+opencv-python-headless==4.12.0.88
+websockets==15.0.1

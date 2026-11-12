@@ -1,0 +1,8 @@
+# Private settings and runtime data never go into git.
+.env
+data/
+*.pt
+*.part.pt
+__pycache__/
+*.pyc
+.venv/

@@ -1,0 +1,55 @@
+# Minimal stack: the Eufy WebSocket bridge plus the wildlife follower.
+# Settings come from .env (copy .env.example). Data stays in ./data.
+services:
+  eufy-security-ws:
+    # Following is only enabled against the bridge/driver versions it was verified with
+    # (server 3.1.0, driver 4.1.0); keep this pinned.
+    image: bropat/eufy-security-ws:3.1.0
+    container_name: eufy-security-ws
+    restart: unless-stopped
+    environment:
+      USERNAME: ${EUFY_USERNAME:-}
+      PASSWORD: ${EUFY_PASSWORD:-}
+      COUNTRY: ${EUFY_COUNTRY:-US}
+      LANGUAGE: en
+    volumes:
+      - ./data/eufy-security-ws:/data
+
+  wildlife-follow:
+    build: .
+    image: eufy-wildlife-follow:local
+    container_name: wildlife-follow
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    depends_on:
+      - eufy-security-ws
+    environment:
+      WILDLIFE_ENABLED: ${WILDLIFE_ENABLED:-0}
+      WILDLIFE_DEVICE_SERIAL: ${WILDLIFE_DEVICE_SERIAL:-}
+      WILDLIFE_WS_URL: ws://eufy-security-ws:3000
+      WILDLIFE_DATA_DIR: /data
+      WILDLIFE_MODEL_PATH: /data/models/megadetector-v6-yolov10-c.pt
+      WILDLIFE_MODE: ${WILDLIFE_MODE:-observe}
+      WILDLIFE_FOLLOW: ${WILDLIFE_FOLLOW:-0}
+      WILDLIFE_SESSION_SECONDS: ${WILDLIFE_SESSION_SECONDS:-30}
+      WILDLIFE_INITIAL_TARGET_SECONDS: ${WILDLIFE_INITIAL_TARGET_SECONDS:-12}
+      WILDLIFE_TARGET_LOSS_SECONDS: ${WILDLIFE_TARGET_LOSS_SECONDS:-8}
+      WILDLIFE_NIGHT_HOLD_SECONDS: ${WILDLIFE_NIGHT_HOLD_SECONDS:-130}
+      WILDLIFE_COOLDOWN_SECONDS: ${WILDLIFE_COOLDOWN_SECONDS:-30}
+      WILDLIFE_CONFIDENCE: ${WILDLIFE_CONFIDENCE:-0.1}
+      WILDLIFE_MIN_BATTERY: ${WILDLIFE_MIN_BATTERY:-25}
+      WILDLIFE_MAX_STEPS: ${WILDLIFE_MAX_STEPS:-16}
+      WILDLIFE_MAX_NET_STEPS: ${WILDLIFE_MAX_NET_STEPS:-5}
+    volumes:
+      - ./data/wildlife:/data
+    mem_limit: 4g
+    cpus: 2
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
