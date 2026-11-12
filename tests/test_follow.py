@@ -300,11 +300,18 @@ class TriggerContextTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(.03)
             self.event("person detected")
             self.event("motion detected")
+            # Wait for the first session: pilot drains events that arrive before its cooldown ends,
+            # and a fixed sleep lost that race on a slower CI runner.
+            for _ in range(200):
+                if any(c.args[0] == "pilot_session" for c in recorded.call_args_list):
+                    break
+                await asyncio.sleep(.01)
             # Simulate the person event ageing out of the 5-second context window.
-            await asyncio.sleep(.05)
             self.client.device_events.clear()
-            self.event("motion detected")
-            await asyncio.wait_for(task, 2)
+            while not task.done():
+                self.event("motion detected")
+                await asyncio.wait({task}, timeout=.05)
+            await task
         sessions = [c.kwargs for c in recorded.call_args_list if c.args[0] == "pilot_session"]
         self.assertEqual([s["trigger"]["category"] for s in sessions], ["person_associated", "motion_only"])
         triggers = [c.kwargs for c in recorded.call_args_list if c.args[0] == "pilot_trigger"]
