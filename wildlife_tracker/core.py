@@ -103,7 +103,9 @@ class Config:
     command_seconds: float = 8
     frame_seconds: float = 8
     startup_seconds: float = 12
-    max_video_chunks: int = 16
+    # Was 16: S340 sessions dropped chunks in 32 of 118, and the E42's 1080p stream dropped 10 in
+    # its first 10 s (2026-11-24), stalling HEVC decode until the next keyframe.
+    max_video_chunks: int = 64
     schema: int = 13
     model_path: str = "/data/models/megadetector-v6-yolov10-c.pt"
     confidence: float = 0.1    # model output floor; tracker hysteresis (tracking.py) decides what counts

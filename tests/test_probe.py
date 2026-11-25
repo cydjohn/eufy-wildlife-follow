@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import test_observer as fixtures
 from wildlife_tracker.core import EufySocket, ProtocolError
-from wildlife_tracker.probe import ProbeLimits, ptz_probe
+from wildlife_tracker.probe import ProbeLimits, ptz_probe, wait_still
 from wildlife_tracker.vision import HEIGHT, WIDTH
 
 LIMITS = ProbeLimits(baseline_seconds=2, confirm_seconds=1, still_seconds=1, onset_seconds=.5,
@@ -270,3 +270,18 @@ class CommandGuardTests(unittest.IsolatedAsyncioTestCase):
         package = pathlib.Path(__file__).resolve().parents[1] / "wildlife_tracker"
         writers = sorted(p.name for p in package.glob("*.py") if "extra_commands = frozenset({" in p.read_text())
         self.assertEqual(writers, ["follow.py", "probe.py"])
+
+
+class DecodeGapTests(unittest.IsolatedAsyncioTestCase):
+    async def test_baseline_survives_a_decode_gap_but_restarts_the_still_count(self):
+        """2026-11-24 E42 1080p: lost chunks left a >2 s gap before the next keyframe."""
+        still = {"moving": False}
+        script = [still, asyncio.TimeoutError(), still, still, still]
+        class GapView:
+            async def frame(self, timeout):
+                item = script.pop(0)
+                if isinstance(item, Exception):
+                    raise item
+                return 0, item
+        self.assertTrue(await wait_still(GapView(), 3, 5))
+        self.assertEqual(script, [])

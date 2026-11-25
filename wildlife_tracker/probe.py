@@ -145,7 +145,12 @@ async def wait_still(view, frames, seconds):
     count = 0
     until = time.monotonic() + seconds
     while time.monotonic() < until:
-        _, motion = await view.frame(min(2, max(.05, until - time.monotonic())))
+        try:
+            _, motion = await view.frame(min(2, max(.05, until - time.monotonic())))
+        except asyncio.TimeoutError:
+            # A decode gap (lost chunks wait for the next keyframe) is not motion; keep waiting.
+            count = 0
+            continue
         count = count + 1 if motion["moving"] is False else 0
         if count >= frames:
             return True
