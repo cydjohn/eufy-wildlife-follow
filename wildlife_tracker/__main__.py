@@ -35,6 +35,11 @@ def redacted_structure(value, key="", depth=0):
     return "[unsupported]"
 
 
+# Pan-and-tilt SoloCams this service accepts. The E42 (T8173) observes like the S340; following
+# also needs its pan step measured with `ptz-probe` (WILDLIFE_PAN_STEP) — see follow.PAN_STEPS.
+SUPPORTED_MODELS = {"T8170", "SoloCam S340", "T8173", "SoloCam E42"}
+
+
 async def selected_device(client, config):
     devices = (client.state or {}).get("devices") or []
     if config.serial not in devices:
@@ -46,8 +51,9 @@ async def selected_device(client, config):
         model = model.get("value")
     if not isinstance(model, str) or not model:
         raise ProtocolError("Selected device model unavailable")
-    if model not in {"T8170", "SoloCam S340"}:
-        raise ProtocolError("Selected device is not an identified SoloCam S340")
+    if model not in SUPPORTED_MODELS:
+        raise ProtocolError("Selected device is not a supported SoloCam (S340 or E42)")
+    config.device_model = model
     return model, values
 
 

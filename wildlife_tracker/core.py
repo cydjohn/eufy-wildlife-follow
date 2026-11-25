@@ -27,7 +27,7 @@ ALLOWED_COMMANDS = {
 }
 WAKE_EVENTS = {"motion detected", "pet detected", "dog detected", "cat detected", "radar motion detected"}
 # Native classifications recorded as trigger context only; they never wake a session.
-# T8170 detection types are human, vehicle and all-other-motion (no pet type).
+# T8170 and T8173 detection types are human, vehicle and all-other-motion (no pet type).
 CONTEXT_EVENTS = WAKE_EVENTS | {"person detected", "stranger person detected", "vehicle detected"}
 SERIAL_RE = re.compile(r"^[A-Za-z0-9_-]{6,64}$")
 
@@ -113,6 +113,10 @@ class Config:
     # At night (infrared frames) stopping our stream switched the IR light off for the rest of Eufy's
     # recording (2026-10-07 05:12:23), so keep the stream until this long after it started.
     night_hold_seconds: float = 130
+    # Measured by `ptz-probe` (pan) on this camera; 0 uses the model's measured default (follow.PAN_STEPS)
+    # and keeps following off for a model without one.
+    pan_step: float = 0           # content shift per pan step, normalized image width
+    device_model: str = None      # set once the selected device is identified
     # Measured by `ptz-probe --axis tilt`; 0 keeps tilt following off.
     tilt_step: float = 0          # content shift per tilt step, normalized image height
     tilt_up_steps: int = 0        # steps from the start view up to the mechanical upper limit
@@ -153,6 +157,12 @@ class Config:
             if not math.isfinite(parsed) or not 0 <= parsed <= 300:
                 raise ValueError("Invalid night_hold_seconds")
             config.night_hold_seconds = parsed
+        pan = os.environ.get("WILDLIFE_PAN_STEP")
+        if pan is not None:
+            parsed = float(pan)
+            if not math.isfinite(parsed) or not 0 <= parsed < .5:
+                raise ValueError("Invalid pan_step")
+            config.pan_step = parsed
         tilt = os.environ.get("WILDLIFE_TILT_STEP")
         if tilt is not None:
             parsed = float(tilt)

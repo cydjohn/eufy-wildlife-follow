@@ -1,13 +1,13 @@
 # eufy-wildlife-follow
 
-When an animal walks past an Eufy SoloCam S340, this local service recognizes it and can turn the camera to keep it in view. It runs on your own machine. No cloud AI and no subscription are involved.
+When an animal walks past an Eufy SoloCam S340 (or E42), this local service recognizes it and can turn the camera to keep it in view. It runs on your own machine. No cloud AI and no subscription are involved.
 
 - Listens for camera events through [eufy-security-ws](https://github.com/bropat/eufy-security-ws).
 - Starts a short live stream and decodes it at 3 FPS.
 - Finds animals with [MegaDetector V6](https://github.com/microsoft/CameraTraps), a detector trained on millions of day and infrared camera-trap images.
 - Optionally pans the camera toward the animal, checks every step against the video, and returns to where it started.
 
-> **Status: experimental, one camera model.** Only the Eufy SoloCam S340 (model `T8170`) is tested, and other models are refused. It has run unattended in one backyard since 2026-10, at night under infrared and in daylight. Expect to tune it for your yard.
+> **Status: experimental.** The Eufy SoloCam S340 (model `T8170`) has run unattended in one backyard since 2026-10, at night under infrared and in daylight. The SoloCam E42 (`T8173`) is accepted for observation; it follows only after you measure its pan step (see below). Other models are refused. Expect to tune it for your yard.
 
 Not affiliated with Anker or Eufy. The Eufy side uses an unofficial API that can change at any time.
 
@@ -38,7 +38,7 @@ At night the stream stays open anyway while Eufy records the clip, and stopping 
 
 Following is off unless `WILDLIFE_FOLLOW=1`. It also stays off unless the bridge reports the verified versions (server 3.1.0, driver 4.1.0).
 
-- **Pan only.** One S340 pan step moves the image by about 11.8% of its width. Tilt is used only after you measure it with `ptz-probe --axis tilt`.
+- **Pan only, by a measured step.** One S340 pan step moves the image by about 11.8% of its width; that value is built in. Any other camera follows only after you measure its step with `ptz-probe` and set `WILDLIFE_PAN_STEP`; until then it logs `follow_mode` as `pan_step_unmeasured` and only observes. Tilt is used only after you measure it with `ptz-probe --axis tilt`.
 - **Write before send.** Every step goes into a durable ledger before it is sent. Afterwards, the measured shift of the whole frame must match the expected size and direction.
 - **Limits.** At most 16 forward steps per session, and at most 5 steps away from the start view.
 - **People.** A native person event from the camera means no forward steps in that session.
@@ -51,7 +51,7 @@ The service never writes camera settings and never sends `ROTATE360`, presets or
 
 | | |
 |---|---|
-| Camera | Eufy SoloCam S340 (`T8170`) |
+| Camera | Eufy SoloCam S340 (`T8170`), or SoloCam E42 (`T8173`) after measuring its pan step |
 | Bridge | eufy-security-ws 3.1.0, logged in with a separate Eufy account that the camera is shared with |
 | Host | Docker; 2 CPU cores and about 1.5 GB RAM. It runs at about 120 ms per frame on an Apple M4 Mac mini under OrbStack. Any x86-64 or arm64 Linux host should work. No GPU is needed. |
 | Network | The host reaches Eufy's cloud and the camera (P2P) |
@@ -70,7 +70,7 @@ The first login may require a verification code. See the [eufy-security-ws docs]
 Then work through these steps with one-off containers (`docker compose run --rm wildlife-follow python -m wildlife_tracker <action>`):
 
 1. **`model-install`**: downloads MegaDetector V6 compact (5.8 MB) from Zenodo, verifies its pinned SHA-256 and class names, and saves it under `data/wildlife/models/`.
-2. **`inventory --show-serials`**: lists cameras on the account. Serials are printed only to your terminal. Copy the S340's serial into `WILDLIFE_DEVICE_SERIAL` in `.env`.
+2. **`inventory --show-serials`**: lists cameras on the account. Serials are printed only to your terminal. Copy the camera's serial into `WILDLIFE_DEVICE_SERIAL` in `.env`. One container watches one camera; for a second camera run a second service with its own serial and data directory.
 3. **`preflight`**: runs read-only checks of the connection, camera identity, versions, settings and stream state.
 4. **`trial --seconds 120`**: one supervised session. Close live view in the Eufy app first. Type `START` when it prints `READY`, then walk through the view. It checks the full pipeline and cleans up.
 5. Set `WILDLIFE_ENABLED=1` in `.env` and run `docker compose up -d wildlife-follow`.
@@ -114,6 +114,7 @@ All settings live in `.env`; see [`.env.example`](.env.example). The ones you ar
 | `WILDLIFE_CONFIDENCE` | `0.1` | detector floor; the tracker decides what counts |
 | `WILDLIFE_MIN_BATTERY` | `25` | skip sessions below this battery % |
 | `WILDLIFE_MAX_NET_STEPS` | `5` | furthest pan from the start view |
+| `WILDLIFE_PAN_STEP` | built in for S340 | measured pan step (fraction of image width) from `ptz-probe`; required to follow with any other model |
 
 ## Privacy and safety
 
@@ -124,7 +125,7 @@ All settings live in `.env`; see [`.env.example`](.env.example). The ones you ar
 
 ## Known limitations
 
-- Only the S340 is supported. Another PTZ model needs `ptz-probe` measurements and code changes; see `StepPolicy` in [`ptz.py`](wildlife_tracker/ptz.py).
+- Only the S340 and E42 are accepted, and only the S340 is field-tested. Another pan-and-tilt model needs a code change to accept it and a `ptz-probe` measurement to follow; see `SUPPORTED_MODELS` in [`__main__.py`](wildlife_tracker/__main__.py) and `PAN_STEPS` in [`follow.py`](wildlife_tracker/follow.py).
 - MegaDetector says "animal", not which species.
 - Small or distant animals at night are sometimes missed. Low-scoring static false boxes are filtered by the tracker, not removed.
 - Daytime pan steps measure smaller than at night. The check tolerance is widened to cover this, but the cause is not yet understood.

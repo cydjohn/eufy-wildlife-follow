@@ -151,6 +151,11 @@ class ObserverTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.marker.exists())
         self.assertNotIn("device.stop_livestream", self.ws.commands)
 
+    async def test_e42_selection_is_accepted_and_recorded(self):
+        self.ws.model = "T8173"
+        model, _ = await selected_device(self.client, self.config)
+        self.assertEqual((model, self.config.device_model), ("T8173", "T8173"))
+
     async def test_non_s340_selection_fails_closed(self):
         self.ws.model = "T8214"
         with self.assertRaises(ProtocolError):

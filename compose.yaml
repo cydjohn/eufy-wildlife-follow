@@ -41,6 +41,7 @@ services:
       WILDLIFE_MIN_BATTERY: ${WILDLIFE_MIN_BATTERY:-25}
       WILDLIFE_MAX_STEPS: ${WILDLIFE_MAX_STEPS:-16}
       WILDLIFE_MAX_NET_STEPS: ${WILDLIFE_MAX_NET_STEPS:-5}
+      WILDLIFE_PAN_STEP: ${WILDLIFE_PAN_STEP:-0}
     volumes:
       - ./data/wildlife:/data
     mem_limit: 4g

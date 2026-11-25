@@ -204,7 +204,27 @@ class FollowTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await ledger_clear(self.config, confirm=AsyncMock(return_value=True)))
         self.assertFalse(self.ledger.exists())
 
+    def test_camera_without_a_measured_pan_step_does_not_follow(self):
+        self.config.follow = True
+        self.config.device_model = "T8173"  # E42: never measured
+        self.assertEqual(follow_available(self.client, self.config), "pan_step_unmeasured")
+        self.config.pan_step = .1
+        self.assertIsNone(follow_available(self.client, self.config))
+        with patch("wildlife_tracker.follow.log"):
+            controller = FollowController(self.client, self.config)
+        self.assertEqual(controller.planner.policy.expected_step, .1)
+        self.config.device_model, self.config.pan_step = "T8170", 0
+        with patch("wildlife_tracker.follow.log"):
+            self.assertEqual(FollowController(self.client, self.config).planner.policy.expected_step, .118)
+        for value in ("-0.1", "0.5", "nan"):
+            with patch.dict(os.environ, {"WILDLIFE_DEVICE_SERIAL": "selected123", "WILDLIFE_PAN_STEP": value}, clear=True):
+                with self.assertRaises(ValueError):
+                    Config.from_env()
+        with patch.dict(os.environ, {"WILDLIFE_DEVICE_SERIAL": "selected123", "WILDLIFE_PAN_STEP": "0.09"}, clear=True):
+            self.assertEqual(Config.from_env().pan_step, .09)
+
     def test_follow_availability_and_setting(self):
+        self.config.device_model = "T8170"
         self.assertEqual(follow_available(self.client, self.config), "disabled")
         self.config.follow = True
         self.assertIsNone(follow_available(self.client, self.config))

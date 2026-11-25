@@ -1,7 +1,7 @@
 """Animal-following control: closed-loop pan steps inside an owned observer session.
 
 Off unless WILDLIFE_FOLLOW=1, and only with the inspected WS/client versions.
-Pan only (the measured S340 step). Every step is written to a durable ledger
+Pan only, by the camera's measured step (S340 built in; others via WILDLIFE_PAN_STEP). Every step is written to a durable ledger
 before it is sent and verified by observed view motion afterwards; once the
 target is lost the session returns by verified reverse steps before the stream
 stops.
@@ -62,10 +62,22 @@ class Ledger:
             os.close(fd)
 
 
+# Measured pan content shift per step, normalized image width (ptz-probe, one camera each).
+# A model missing here follows only once WILDLIFE_PAN_STEP gives its own measurement.
+PAN_STEPS = {"T8170": .118, "SoloCam S340": .118}
+
+
+def pan_step(config):
+    """This camera's measured pan step, or None when it was never measured."""
+    return config.pan_step or PAN_STEPS.get(config.device_model)
+
+
 def follow_available(client, config):
     """Reason following cannot run in this session, or None."""
     if not config.follow:
         return "disabled"
+    if pan_step(config) is None:
+        return "pan_step_unmeasured"
     if any((client.version or {}).get(k) != v for k, v in VERIFIED_VERSIONS.items()):
         return "unverified_ws_versions"
     return None
@@ -77,6 +89,7 @@ class FollowController:
         self.config = config
         # Closed loop; tilt only once its step and the steps to the upper limit were measured (ptz-probe --axis tilt).
         self.planner = StepPlanner(policy or StepPolicy(
+            expected_step=pan_step(config) or StepPolicy.expected_step,
             tilt_enabled=config.tilt_step > 0, tilt_expected_step=config.tilt_step, max_up_steps=config.tilt_up_steps,
             max_steps=config.max_steps, max_net_steps=config.max_net_steps))
         self.ledger = Ledger(config.data_dir)
